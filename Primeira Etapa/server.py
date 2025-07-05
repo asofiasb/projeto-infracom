@@ -19,19 +19,22 @@ os.makedirs(SERVER_DIR, exist_ok=True)
 
 while True:
 
+    ## receive the filename from the client
     data, client_addr = sock.recvfrom(BUFFER_SIZE)
     original_name = data.decode().strip()
     print(f"RECEIVED '{original_name}' from {client_addr}")
 
+    ## receive the file content from the client
     save_original_path = os.path.join(SERVER_DIR, original_name)
     with open(save_original_path, "wb") as f:
         while True:
             chunk, _ = sock.recvfrom(BUFFER_SIZE)
-            if chunk == PARADA:
+            if chunk == PARADA: ## wait for the end signal
                 break
             f.write(chunk)
     print(f"File saved as '{original_name}'")
 
+    ## change the file name and send it back to the client
     new_name = change_file_name(original_name)
 
     sock.sendto(new_name.encode(), client_addr)
@@ -43,5 +46,6 @@ while True:
                 break
             sock.sendto(chunk, client_addr)
 
+    ## send the end signal to the client
     sock.sendto(PARADA, client_addr)
     print(f"'{new_name}' sent back to {client_addr}\n")

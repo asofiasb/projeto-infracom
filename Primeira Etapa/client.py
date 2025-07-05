@@ -14,23 +14,27 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((HOST,PORT))
 
 def sendFile(filename):
-    ## extract the file name from the path
+    ## send filename to server
     file_name = filename.split("/")[-1]
     sock.sendto(file_name.encode(), (SERVER_HOST, SERVER_PORT))
     print(f"Sending file: {file_name} to server at {SERVER_HOST}:{SERVER_PORT}")
 
+    ## send file content to server
     with open(filename, "rb") as file:
         while True:
             data = file.read(BUFFER_SIZE)
             if not data:
                 break
             sock.sendto(data, (SERVER_HOST, SERVER_PORT))
+    
+    ## send end signal to server
     sock.sendto(b"END", (SERVER_HOST, SERVER_PORT))
     print(f"File {filename} sent successfully.")
 
 def waitForResponse():
     sock.settimeout(3.0)
     try:
+        ## wait for response from server (filename)
         data, addr = sock.recvfrom(BUFFER_SIZE)
         if data:
             print(f"Response received from {addr}: {data.decode()}")
@@ -46,6 +50,7 @@ def waitForResponse():
         return None
 
 def receiveFile(filename):
+    ## receive file content from server
     file = join(CLIENT_DIR, filename)
     with open(file, "wb") as file:
         while True:
