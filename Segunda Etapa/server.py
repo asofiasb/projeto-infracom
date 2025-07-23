@@ -31,21 +31,21 @@ while True:
     with open(save_original_path, "wb") as f:
         expected_seqnum = 0
         while True:
-            chunk, _ = sock.recvfrom(BUFFER_SIZE)
-            if random.random() < 0.1:
-              print("Simulando perda de pacote recebido.")
+            chunk, _ = sock.recvfrom(BUFFER_SIZE) ## receive packet containing sequence number and data
+            if random.random() < 0.1: ## simulates packet loss
               continue
-            seq = struct.unpack('>I', chunk[:4])[0]
+            seq = struct.unpack('>I', chunk[:4])[0] ## unpack sequence number and data
             data = chunk[4:]
 
             if data == PARADA: ## wait for the end signal
                 break
 
+            ## if sequence number received is the expected, send ack and update it, else resend last ack (client sent a duplicate)
             if seq == expected_seqnum:
                 f.write(data)
                 f.flush()
                 ack = f"ACK{seq}".encode()
-                sock.sendto(ack, client_addr) #enviando ACKs
+                sock.sendto(ack, client_addr) 
                 expected_seqnum = 1 - expected_seqnum
             else:
                 ack = f"ACK{1-expected_seqnum}".encode()

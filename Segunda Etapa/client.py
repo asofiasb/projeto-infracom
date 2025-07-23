@@ -34,26 +34,27 @@ def sendFile(filename):
                 break
             
             packed_seqnum = struct.pack('>I', seqnum)
-            datafull = packed_seqnum + data
+            datafull = packed_seqnum + data ## packs sequence number and data
             while True:
-              if random.random() < 0.1:
-                  print("Simulando perda de pacote no envio.")
+              if random.random() < 0.1: ## simulates packet loss 
                   continue
-              sock.sendto(datafull, (SERVER_HOST, SERVER_PORT)) #server line 32
+              sock.sendto(datafull, (SERVER_HOST, SERVER_PORT)) ## sends packet containing sequence number and data
               try:
-                ackrcv, _ = sock.recvfrom(BUFFER_SIZE) #server line 44 48
-                if random.random() < 0.1:
-                  print("Simulando perda de ack recebido.")
+                ackrcv, _ = sock.recvfrom(BUFFER_SIZE) ## receives ack
+                if random.random() < 0.1: ## simulates ack loss
                   continue
                 ack = ackrcv.decode()
-                if ack == f"ACK{seqnum}":
-                  seqnum = 1 - seqnum
-                  break
 
-              except socket.timeout:
-                  print("Timeout")
+                ## if expected ack is received, breaks loop and sends next packet, else resends same packet
+                if ack == f"ACK{seqnum}": 
+                  seqnum = 1 - seqnum
+                  break 
+
+              ## timeout restarts loop and resends packet
+              except socket.timeout: 
+                  print("Timeout") 
         
-    sock.settimeout(3.0)
+    sock.settimeout(4.0)
     ## send end signal to server
     packed_seqnum = struct.pack('>I', seqnum)
     dataend = packed_seqnum + b"END"
@@ -61,7 +62,7 @@ def sendFile(filename):
     print(f"File {filename} sent successfully.")
 
 def waitForResponse():
-    sock.settimeout(3.0)
+    sock.settimeout(5.0)
     try:
         ## wait for response from server (filename)
         data, addr = sock.recvfrom(BUFFER_SIZE)
@@ -80,15 +81,20 @@ def waitForResponse():
         return None
 
 def receiveFile(filename):
+    sock.settimeout(5.0)
     ## receive file content from server
     file = join(CLIENT_DIR, filename)
     with open(file, "wb") as file:
         while True:
-            data, addr = sock.recvfrom(BUFFER_SIZE)
-            if not data or data == b"END":
+            try:
+              data, addr = sock.recvfrom(BUFFER_SIZE)
+              if not data or data == b"END":
+                  break
+              file.write(data)
+              file.flush()
+            except socket.timeout:
+                print("Timeout while receiving file packet. Closing connection.")
                 break
-            file.write(data)
-            file.flush()
 
     print(f"File {filename} received successfully.")
 
