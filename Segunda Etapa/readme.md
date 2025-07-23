@@ -1,5 +1,6 @@
 # Segunda Etapa
 Está é a segunda etapa do projeto de Infraestrutura de Computação, onde implementamos uma comunicação cliente-servidor usando o protocolo UDP com transferência confiável baseada no RDT 3.0, que garante a confiabilidade mesmo com perdas de pacotes por meio do uso de **ACKs** e **timeouts**.
+
 Assim como na primeira etapa, o cliente envia um arquivo para o servidor, que o salva e envia de volta com um nome modificado.
 
 # Instruções de Uso
