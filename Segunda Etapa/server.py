@@ -73,7 +73,8 @@ while True:
                 sock.sendto(final_ack, client_addr)  ## resend final ACK
     except socket.timeout:
         pass 
-
+    
+    sock.settimeout(None)
     print(f"File saved as '{original_name}'")
 
     ## change the file name and send it back to the client
