@@ -19,11 +19,28 @@ sock.bind((HOST,PORT))
 
 def sendFile(filename):
     ## send filename to server
-    file_name = filename.split("/")[-1]
-    sock.sendto(file_name.encode(), (SERVER_HOST, SERVER_PORT))
-    print(f"Sending file: {file_name} to server at {SERVER_HOST}:{SERVER_PORT}")
-
+    sock.settimeout(2.0)
     seqnum = 0
+    file_name = filename.split("/")[-1]
+    packed_seqnum = struct.pack('>I', seqnum)
+    file_name_packet = packed_seqnum + file_name.encode() ## packs sequence number and file name
+
+    while True: 
+      sock.sendto(file_name_packet, (SERVER_HOST, SERVER_PORT))
+      try:
+          ackrcv, _ = sock.recvfrom(BUFFER_SIZE) ## receives ack
+          if random.random() < 0.1: ## simulates ack loss
+              continue
+          ack = ackrcv.decode()
+
+          ## if expected ack is received, breaks loop and start sending data, else resend file name
+          if ack == f"ACK{seqnum}": 
+              print(f"Sending file: {file_name} to server at {SERVER_HOST}:{SERVER_PORT}")
+              seqnum = 1 - seqnum
+              break  
+      except socket.timeout:
+          print("Timeout on file name")
+
     sock.settimeout(2.0)
 
     ## send file content to server
@@ -42,24 +59,41 @@ def sendFile(filename):
               try:
                 ackrcv, _ = sock.recvfrom(BUFFER_SIZE) ## receives ack
                 if random.random() < 0.1: ## simulates ack loss
-                  continue
+                    continue
                 ack = ackrcv.decode()
 
                 ## if expected ack is received, breaks loop and sends next packet, else resends same packet
                 if ack == f"ACK{seqnum}": 
-                  seqnum = 1 - seqnum
-                  break 
+                    seqnum = 1 - seqnum
+                    break 
 
               ## timeout restarts loop and resends packet
               except socket.timeout: 
-                  print("Timeout") 
-        
+                  print("Timeout on file chunk") 
+
     sock.settimeout(4.0)
-    ## send end signal to server
     packed_seqnum = struct.pack('>I', seqnum)
     dataend = packed_seqnum + b"END"
-    sock.sendto(dataend, (SERVER_HOST, SERVER_PORT))
-    print(f"File {filename} sent successfully.")
+
+    while True:
+        if random.random() < 0.1: ## simulates packet loss 
+            continue
+        ## send end signal to server
+        sock.sendto(dataend, (SERVER_HOST, SERVER_PORT))
+        try:
+          ackrcv, _ = sock.recvfrom(BUFFER_SIZE) ## receives ack
+          if random.random() < 0.1: ## simulates ack loss
+              continue
+          ack = ackrcv.decode()
+
+          ## if expected ack is received, breaks loop and prints end message
+          if ack == f"ACK{seqnum}": 
+              print(f"File {filename} sent successfully.")
+              break 
+
+        ## timeout restarts loop and resends end packet
+        except socket.timeout: 
+            print("Timeout on end") 
 
 def waitForResponse():
     sock.settimeout(5.0)

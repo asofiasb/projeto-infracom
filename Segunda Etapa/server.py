@@ -20,16 +20,25 @@ print(f"Servidor em {HOST}:{PORT}, aguardando…")
 os.makedirs(SERVER_DIR, exist_ok=True)
 
 while True:
+    expected_seqnum = 0
 
     ## receive the filename from the client
     data, client_addr = sock.recvfrom(BUFFER_SIZE)
-    original_name = data.decode().strip()
+    seq = struct.unpack('>I', data[:4])[0] ## unpack sequence number and file name
+    original_name = data[4:].decode().strip()
     print(f"RECEIVED '{original_name}' from {client_addr}")
+
+    if seq == expected_seqnum:
+      ack = f"ACK{seq}".encode()
+      sock.sendto(ack, client_addr) 
+      expected_seqnum = 1 - expected_seqnum
+    else:
+      ack = f"ACK{1-expected_seqnum}".encode()
+      sock.sendto(ack, client_addr)
 
     ## receive the file content from the client
     save_original_path = os.path.join(SERVER_DIR, original_name)
     with open(save_original_path, "wb") as f:
-        expected_seqnum = 0
         while True:
             chunk, _ = sock.recvfrom(BUFFER_SIZE) ## receive packet containing sequence number and data
             if random.random() < 0.1: ## simulates packet loss
@@ -38,6 +47,8 @@ while True:
             data = chunk[4:]
 
             if data == PARADA: ## wait for the end signal
+                ack = f"ACK{seq}".encode()
+                sock.sendto(ack, client_addr)
                 break
 
             ## if sequence number received is the expected, send ack and update it, else resend last ack (client sent a duplicate)
@@ -51,7 +62,18 @@ while True:
                 ack = f"ACK{1-expected_seqnum}".encode()
                 sock.sendto(ack, client_addr)
 
-            
+    final_ack = f"ACK{seq}".encode()
+    sock.settimeout(2.0)  ## wait in case client did not receive final ack
+    try:
+        while True:
+            chunk, _ = sock.recvfrom(BUFFER_SIZE)
+            seq_repeat = struct.unpack('>I', chunk[:4])[0]
+            data = chunk[4:]
+            if data == PARADA and seq_repeat == seq:
+                sock.sendto(final_ack, client_addr)  ## resend final ACK
+    except socket.timeout:
+        pass 
+
     print(f"File saved as '{original_name}'")
 
     ## change the file name and send it back to the client
