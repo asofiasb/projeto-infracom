@@ -6,7 +6,6 @@ import random
 HOST, PORT = "127.0.0.1", 6001
 BUFFER_SIZE = 1024
 PARADA = b"END"
-
 SERVER_DIR = os.path.join(os.path.dirname(__file__), "server")
 
 def change_file_name(filename: str) -> str:
@@ -15,80 +14,102 @@ def change_file_name(filename: str) -> str:
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((HOST, PORT))
-print(f"Servidor em {HOST}:{PORT}, aguardando…")
+print(f"[Server] Listening on {HOST}:{PORT}...")
 
 os.makedirs(SERVER_DIR, exist_ok=True)
 
 while True:
     expected_seqnum = 0
 
-    ## receive the filename from the client
+    # Receive filename
     data, client_addr = sock.recvfrom(BUFFER_SIZE)
-    seq = struct.unpack('>I', data[:4])[0] ## unpack sequence number and file name
+    seq = struct.unpack('>I', data[:4])[0]
     original_name = data[4:].decode().strip()
-    print(f"RECEIVED '{original_name}' from {client_addr}")
+    print(f"[Server] Received filename '{original_name}' from {client_addr}")
 
     if seq == expected_seqnum:
-      ack = f"ACK{seq}".encode()
-      sock.sendto(ack, client_addr) 
-      expected_seqnum = 1 - expected_seqnum
+        sock.sendto(f"ACK{seq}".encode(), client_addr)
+        expected_seqnum = 1 - expected_seqnum
     else:
-      ack = f"ACK{1-expected_seqnum}".encode()
-      sock.sendto(ack, client_addr)
+        sock.sendto(f"ACK{1 - expected_seqnum}".encode(), client_addr)
 
-    ## receive the file content from the client
-    save_original_path = os.path.join(SERVER_DIR, original_name)
-    with open(save_original_path, "wb") as f:
+    # Receive file content
+    save_path = os.path.join(SERVER_DIR, original_name)
+    with open(save_path, "wb") as f:
         while True:
-            chunk, _ = sock.recvfrom(BUFFER_SIZE) ## receive packet containing sequence number and data
-            if random.random() < 0.1: ## simulates packet loss
-              continue
-            seq = struct.unpack('>I', chunk[:4])[0] ## unpack sequence number and data
+            chunk, _ = sock.recvfrom(BUFFER_SIZE)
+            if random.random() < 0.1:
+                continue
+            seq = struct.unpack('>I', chunk[:4])[0]
             data = chunk[4:]
 
-            if data == PARADA: ## wait for the end signal
-                ack = f"ACK{seq}".encode()
-                sock.sendto(ack, client_addr)
+            if data == PARADA:
+                sock.sendto(f"ACK{seq}".encode(), client_addr)
                 break
 
-            ## if sequence number received is the expected, send ack and update it, else resend last ack (client sent a duplicate)
             if seq == expected_seqnum:
                 f.write(data)
                 f.flush()
-                ack = f"ACK{seq}".encode()
-                sock.sendto(ack, client_addr) 
+                print(f"[Server] Packet seq={seq} received and written")
+                sock.sendto(f"ACK{seq}".encode(), client_addr)
                 expected_seqnum = 1 - expected_seqnum
             else:
-                ack = f"ACK{1-expected_seqnum}".encode()
-                sock.sendto(ack, client_addr)
+                print(f"[Server] Duplicate packet seq={seq}, ignored")
+                sock.sendto(f"ACK{1 - expected_seqnum}".encode(), client_addr)
 
-    final_ack = f"ACK{seq}".encode()
-    sock.settimeout(2.0)  ## wait in case client did not receive final ack
-    try:
-        while True:
-            chunk, _ = sock.recvfrom(BUFFER_SIZE)
-            seq_repeat = struct.unpack('>I', chunk[:4])[0]
-            data = chunk[4:]
-            if data == PARADA and seq_repeat == seq:
-                sock.sendto(final_ack, client_addr)  ## resend final ACK
-    except socket.timeout:
-        pass 
-    
-    sock.settimeout(None)
-    print(f"File saved as '{original_name}'")
+    print(f"[Server] File saved as '{original_name}'")
 
-    ## change the file name and send it back to the client
+    # Rename and send back the file
     new_name = change_file_name(original_name)
-
     sock.sendto(new_name.encode(), client_addr)
 
-    with open(save_original_path, "rb") as f:
-        while True:
-            chunk = f.read(BUFFER_SIZE)
-            if not chunk:
-                break
-            sock.sendto(chunk, client_addr)
+    with open(save_path, "rb") as f:
+        seqnum = 0
+        sock.settimeout(2.0)
 
-    ## send the end signal to the client
-    sock.sendto(PARADA, client_addr)
-    print(f"'{new_name}' sent back to {client_addr}\n")
+        while True:
+            data = f.read(BUFFER_SIZE - 4)
+            if not data:
+                break
+
+            packed_data = struct.pack(">I", seqnum) + data
+
+            while True:
+                if random.random() < 0.1:
+                    print(f"[Server] Simulated packet loss seq={seqnum}")
+                    continue
+                sock.sendto(packed_data, client_addr)
+                print(f"[Server] Sent packet seq={seqnum}")
+
+                try:
+                    ack_data, _ = sock.recvfrom(BUFFER_SIZE)
+                    if random.random() < 0.1:
+                        print(f"[Server] Simulated ACK loss for seq={seqnum}")
+                        continue
+                    ack = ack_data.decode()
+                    if ack == f"ACK{seqnum}":
+                        print(f"[Server] ACK received seq={seqnum}")
+                        seqnum = 1 - seqnum
+                        break
+                except socket.timeout:
+                    print(f"[Server] Timeout waiting for ACK seq={seqnum}, resending...")
+
+        # Send end signal
+        end_packet = struct.pack(">I", seqnum) + PARADA
+        while True:
+            if random.random() < 0.1:
+                print("[Server] Simulated loss of end packet")
+                continue
+            sock.sendto(end_packet, client_addr)
+            print("[Server] Sending end packet")
+
+            try:
+                ack_data, _ = sock.recvfrom(BUFFER_SIZE)
+                ack = ack_data.decode()
+                if ack == f"ACK{seqnum}":
+                    print("[Server] Final ACK received. Transfer complete.\n")
+                    break
+            except socket.timeout:
+                print("[Server] Timeout waiting for final ACK, resending...")
+
+    sock.settimeout(None)
