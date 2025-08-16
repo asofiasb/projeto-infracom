@@ -27,7 +27,6 @@ IF678-ChatCIn
 │ ├── 📁 rdt # Implementação do RDT 3.0
 │ ├── cliente.py # Cliente do chat em grupo
 │ ├── server.py # Servidor do chat em grupo
-│ ├── main_test.py # Script de teste do chat
 │ └── readme.md
 │
 ├── .gitignore
