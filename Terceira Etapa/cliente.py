@@ -22,7 +22,7 @@ def main():
 
     while True:
         msg = input()
-        rdt_client.send(msg, Peer(HOST, PORT))
+        rdt_client.send(msg.encode(), Peer(HOST, PORT))
 
 if __name__ == "__main__":
     main()

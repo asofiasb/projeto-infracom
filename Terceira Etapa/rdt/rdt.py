@@ -69,11 +69,8 @@ class RDT:
         peer = self.sender_to_peer.get(sender_addr)
         if not peer:
             return
-        try:
-            text = payload.decode('utf-8', errors='replace')
-        except Exception:
-            text = "<binary data>"
-        self.user_message_queue.put((peer, text))
+        
+        self.user_message_queue.put((peer, payload))
 
     def _run_manager(self):
         while True:
