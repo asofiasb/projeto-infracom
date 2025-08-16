@@ -1,16 +1,13 @@
-
-import struct
 import threading
-from rdt.rdt import RDT, Peer
+from rdt import RDT, Peer
 
 HOST = "127.0.0.1"
 PORT = 6000
 BUFFER_SIZE = 1024
-PACKET_FORMAT = "!BBH" # tipo da mensagem (ack, msg), seq, tamanho do payload
 
 def listen(rdt: RDT): # espera respostas do servidor
     while True:
-        peer, payload = rdt.receive(timeout=0.01)
+        peer, payload = rdt.receive()
         msg = payload.decode()
         print(msg)
 

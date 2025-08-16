@@ -69,7 +69,6 @@ class RDT:
         peer = self.sender_to_peer.get(sender_addr)
         if not peer:
             return
-        
         self.user_message_queue.put((peer, payload))
 
     def _run_manager(self):
@@ -106,10 +105,10 @@ class RDT:
         self.pending_connections.pop(target_peer, None)
         return success
 
-    def send(self, data: str, peer: Peer):
+    def send(self, data: bytes, peer: Peer):
         if peer not in self.peer_to_receiver:
             raise ConnectionError(f"Not connected to peer {peer}. Use connect() first.")
-        self._enqueue_to_send(self.peer_to_receiver[peer], data.encode('utf-8', errors='strict'))
+        self._enqueue_to_send(self.peer_to_receiver[peer], data)
 
     def broadcast(self, data: str):
         payload = data.encode('utf-8', errors='strict')

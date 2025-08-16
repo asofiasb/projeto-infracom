@@ -95,3 +95,7 @@ class Peer:
     
     def get_address(self):
         return (self.host, self.port)
+    
+    def __iter__(self):
+        yield self.host
+        yield self.port
