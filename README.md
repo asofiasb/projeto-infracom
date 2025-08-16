@@ -34,12 +34,10 @@ IF678-ChatCIn
 └── README.md
 ```
 
----
 
 ## 👨‍💻 Desenvolvimento do Projeto
 A implementação foi feita de forma colaborativa, onde cada membro participou de sessões de desenvolvimento sem uma divisão rígida de tarefas específicas.
 
----
 
 ## 🔥 Como Rodar o Projeto
 
@@ -52,7 +50,6 @@ A implementação foi feita de forma colaborativa, onde cada membro participou d
    ```sh
    python client.py
    ```
----
 
 ## 🛠️ Tecnologias Utilizadas
 - **Python**
